@@ -1,5 +1,49 @@
+import os
 import numpy as np
+import glob
 from typing import NamedTuple
+from PIL import Image
+
+
+class Assets(NamedTuple):
+    empty: np.ndarray = None
+    mine: np.ndarray = None
+    numbers: list[np.ndarray] = [None] * 9
+
+
+class MinesweeperAssets:
+    def __init__(self, assets_dir):
+        self.setFilePath(asset_dir=assets_dir)
+        self.loadImages()
+        self.assets = Assets(
+            empty=self.image_empty, mine=self.image_mine, numbers=self.images_number
+        )
+
+    def setFilePath(self, asset_dir):
+        self.image_path_list = glob.glob(os.path.join(asset_dir, "*.png"))
+
+    def loadImages(self):
+        self.images_number = [None] * 9
+        for image_path in self.image_path_list:
+            image = Image.open(image_path)
+            image = np.array(image)
+            image_name = os.path.basename(image_path).split(".")[0]
+            print(type(image))
+            print(image_name)
+            if image_name == "nan":
+                self.image_empty = image
+            elif image_name == "mine":
+                self.image_mine = image
+            else:
+                number = int(image_name)
+                self.images_number[number] = image
+
+
+# empty = np.zeros((2, 2))
+# mine = np.zeros((2, 2))
+# numbers = [np.zeros((2, 2))] * 5
+
+# assets = Assets(empty=empty, mine=mine, numbers=numbers)
 
 
 class MinesweeperReward(NamedTuple):
@@ -9,7 +53,7 @@ class MinesweeperReward(NamedTuple):
 
 
 class MinesweeperEnv:
-    def __init__(self, row=9, col=9, numMines=10):
+    def __init__(self, row=9, col=9, numMines=10, assetsDir="./assets/gray/"):
         self.row = row  # 行（高さ）
         self.col = col  # 列（横幅）
         self.numMines = numMines  # 地雷の個数
@@ -26,6 +70,8 @@ class MinesweeperEnv:
         self.initialized = False  # 初期化判定
         self.won = False  # 成功判定
 
+        self.assets = MinesweeperAssets(assets_dir=assetsDir)
+
     # ゲームのリセット
     def reset(self):
         self.mines.fill(0)
@@ -36,6 +82,32 @@ class MinesweeperEnv:
         self.initialized = False
         self.won = False
         return self.state
+
+    # 盤面の状態を画像で取得する
+    def stateImage(self):
+        screen_arr = np.zeros((self.row * 14, self.col * 14))
+        for i, row in enumerate(self.state):
+            for j, col in enumerate(row):
+                # 空いてないマス
+                if np.isnan(col):
+                    img_arr = self.assets.assets.empty
+                # 地雷
+                elif int(col) == -100:
+                    img_arr = self.assets.assets.mine
+                # 空いているマス
+                else:
+                    img_arr = self.assets.assets.numbers[int(col)]
+
+                w, h = img_arr.shape
+                screen_arr[i * w : (i + 1) * w, j * h : (j + 1) * h] += img_arr
+
+        img = Image.fromarray(screen_arr)
+        img_gray = img.convert("L")
+        img_gray.save("tmp.png")
+        raise os.error
+        # screen_arr = np.ravel(screen_arr)
+        # screen_tensor = torch.tensor(screen_arr, dtype=torch.float)
+        return screen_tensor
 
     # 1ステップ進める
     def step(self, coordinates):
@@ -63,6 +135,7 @@ class MinesweeperEnv:
                 done = True
                 self.won = True
 
+        self.stateImage()
         return self.state, reward, done, {}
 
     # 盤面の初期化

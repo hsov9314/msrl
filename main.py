@@ -41,7 +41,7 @@ num_states = row * col
 num_actions = row * col
 agent = Agent(num_states, num_actions)  # 環境内で行動するAgentを生成
 
-NUM_EPISODES = 5000  # 最大試行回数
+NUM_EPISODES = 1  # 最大試行回数
 win = 0
 lose = 0
 
@@ -110,4 +110,3 @@ for episode in range(1, NUM_EPISODES + 1):
             writer.writerow([episode, step, winTest])
         winTest = 0
 torch.save(agent.brain.model.state_dict(), "model.pth")
-
