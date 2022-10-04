@@ -8,9 +8,7 @@ from collections import namedtuple
 from model import Net
 
 # 経験を保存するメモリクラスを定義します
-Transition = namedtuple(
-    "Transition", ("state", "action", "next_state", "reward", "availableAction")
-)
+Transition = namedtuple("Transition", ("state", "action", "next_state", "reward"))
 
 
 class ReplayMemory:
@@ -19,13 +17,11 @@ class ReplayMemory:
         self.memory = []  # 経験を保存する変数
         self.index = 0  # 保存するindexを示す変数
 
-    def push(self, state, action, state_next, reward, availableAction):
+    def push(self, state, action, state_next, reward):
         """transition = (state, action, state_next, reward)をメモリに保存する"""
         if len(self.memory) < self.capacity:
             self.memory.append(None)  # メモリが満タンでないときは足す
-        self.memory[self.index] = Transition(
-            state, action, state_next, reward, availableAction
-        )
+        self.memory[self.index] = Transition(state, action, state_next, reward)
         self.index = (self.index + 1) % self.capacity
 
     def sample(self, batch_size):
@@ -39,7 +35,7 @@ class ReplayMemory:
 
 GAMMA = 0.9  # 時間割引率
 BATCH_SIZE = 400
-CAPACITY = 10 ** 6
+CAPACITY = 10**6
 
 
 class Brain:
@@ -50,12 +46,14 @@ class Brain:
         self.memory = ReplayMemory(CAPACITY)
 
         # ニューラルネットワークを構築
+        # n_in, n_mid, n_out = num_states, 64, num_actions
         n_in, n_mid, n_out = num_states, 64, num_actions
+
         self.model = Net(n_in, n_mid, n_out)
         print(self.model)  # ネットワークの形を出力
 
         # 最適化手法の設定
-        self.optimizer = optim.Adam(self.model.parameters(), lr=10 ** -4)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=10**-4)
 
         self.epsilon = 0.5
 
@@ -92,9 +90,6 @@ class Brain:
         non_final_next_states = torch.cat(
             [s for s in batch.next_state if s is not None]
         )
-        availableAction_batch = torch.cat(
-            [a for a in batch.availableAction if a is not None]
-        )
 
         # -----------------------------------------
         # 3. 教師信号となるQ(s_t, a_t)値を求める
@@ -123,9 +118,7 @@ class Brain:
         # そしてそのQ値（index=0）を出力します
         # detachでその値を取り出します
         next_state_values[non_final_mask] = (
-            (self.model(non_final_next_states) + availableAction_batch)
-            .max(1)[0]
-            .detach()
+            (self.model(non_final_next_states)).max(1)[0].detach()
         )
 
         # 3.4 教師となるQ(s_t, a_t)値を、Q学習の式から求める
@@ -149,22 +142,22 @@ class Brain:
         loss.backward()  # バックプロパゲーションを計算
         self.optimizer.step()  # 結合パラメータを更新
 
-    def decide_action(self, state, availableAction, env):
+    def decide_action(self, state, env):
         """現在の状態に応じて、行動を決定する"""
         # ε-greedy法で徐々に最適行動のみを採用する
 
         if self.epsilon <= np.random.uniform(0, 1):
             self.model.eval()  # ネットワークを推論モードに切り替える
             with torch.no_grad():
-                action = (self.model(state) + availableAction).max(1)[1].view(1, 1)
-                # print((self.model(state)*availableAction).max(1)[0].detach())
+                print(self.model(state).max(1)[1])
+                action = self.model(state).max(1)[1].view(1, 1)
         else:
             action = torch.LongTensor([[env.randomAction()]])
 
         return action
 
     def updateEpsilon(self):
-        self.epsilon *= 0.9997
+        self.epsilon *= 0.999
         self.epsilon = max(self.epsilon, 0.1)
 
 
@@ -180,14 +173,14 @@ class Agent:
         """Q関数を更新する"""
         self.brain.replay()
 
-    def get_action(self, state, availableAction, env):
+    def get_action(self, state, env):
         """行動を決定する"""
-        action = self.brain.decide_action(state, availableAction, env)
+        action = self.brain.decide_action(state, env)
         return action
 
-    def memorize(self, state, action, state_next, reward, availableAction):
+    def memorize(self, state, action, state_next, reward):
         """memoryオブジェクトに、state, action, state_next, rewardの内容を保存する"""
-        self.brain.memory.push(state, action, state_next, reward, availableAction)
+        self.brain.memory.push(state, action, state_next, reward)
 
     def updateEpsilon(self):
         self.brain.updateEpsilon()

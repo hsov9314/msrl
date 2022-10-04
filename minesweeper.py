@@ -3,6 +3,8 @@ import numpy as np
 import glob
 from typing import NamedTuple
 from PIL import Image
+from torch import tensor
+import torchvision
 
 
 class Assets(NamedTuple):
@@ -28,8 +30,6 @@ class MinesweeperAssets:
             image = Image.open(image_path)
             image = np.array(image)
             image_name = os.path.basename(image_path).split(".")[0]
-            print(type(image))
-            print(image_name)
             if image_name == "nan":
                 self.image_empty = image
             elif image_name == "mine":
@@ -50,6 +50,7 @@ class MinesweeperReward(NamedTuple):
     win: float = 1.0
     lose: float = -1.0
     progress: float = 0.0
+    unavailable: float = -0.1
 
 
 class MinesweeperEnv:
@@ -103,11 +104,10 @@ class MinesweeperEnv:
 
         img = Image.fromarray(screen_arr)
         img_gray = img.convert("L")
-        img_gray.save("tmp.png")
-        raise os.error
         # screen_arr = np.ravel(screen_arr)
         # screen_tensor = torch.tensor(screen_arr, dtype=torch.float)
-        return screen_tensor
+        tensor_img = torchvision.transforms.functional.to_tensor(img_gray)
+        return tensor_img
 
     # 1ステップ進める
     def step(self, coordinates):
@@ -115,8 +115,7 @@ class MinesweeperEnv:
         done = False
         # 開いているマスを開けた 例外処理
         if not np.isnan(self.state[coordinates[0], coordinates[1]]):
-            print("noprogress")
-            reward = -1
+            reward = self.reward.unavailable
         # 地雷マスを開けた
         if self.mines[coordinates[0], coordinates[1]] > 0:
             self.state[coordinates[0], coordinates[1]] = -100  # 地雷
@@ -135,8 +134,7 @@ class MinesweeperEnv:
                 done = True
                 self.won = True
 
-        self.stateImage()
-        return self.state, reward, done, {}
+        return self.state, reward, done, {}, self.stateImage()
 
     # 盤面の初期化
     def initializeBoard(self, coordinates):
@@ -192,8 +190,11 @@ class MinesweeperEnv:
                             if np.isnan(self.state[row + i, col + j]):
                                 self.openCell([row + i, col + j])
 
-    # ランダムアクション（開いていないマスを開ける）
+    # ランダムアクション
     def randomAction(self):
+        # cells = np.arange(self.row * self.col)
+        # action = np.random.choice(cells)
+
         nonOpenCell = np.array(np.where(self.noOpenCell)).flatten()
         action = np.random.choice(nonOpenCell)
         return action
@@ -210,28 +211,6 @@ class MinesweeperEnv:
             np.random.choice(availableCells, self.numMines, replace=False)
         ] = 1
         self.mines = minesFlattend.reshape([self.row, self.col])
-        # 隣接する地雷の個数
-        for row in range(self.row):
-            for col in range(self.col):
-                numNeighbors = 0
-                for i in range(-1, 2):
-                    if row + i >= 0 and row + i < self.row:
-                        for j in range(-1, 2):
-                            if col + j >= 0 and col + j < self.col:
-                                if not (i == 0 and j == 0):
-                                    numNeighbors += self.mines[row + i, col + j]
-                self.neighbors[row, col] = numNeighbors
-
-        self.state.fill(np.nan)
-        self.noOpenCell.fill(1)
-
-        self.initialized = True
-        self.won = False
-        return self.state
-
-    # 固定の地雷配置パターン
-    def ResetAndSetMines(self, mines):
-        self.mines = np.copy(mines)
         # 隣接する地雷の個数
         for row in range(self.row):
             for col in range(self.col):

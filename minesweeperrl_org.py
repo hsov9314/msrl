@@ -7,13 +7,9 @@ Original file is located at
     https://colab.research.google.com/drive/186TEoC7_oHRtUtndAcgbuhH0ZAbzowKp
 """
 
-from google.colab import drive
-drive.mount('/content/drive')
 
 import os
-os.chdir('drive/My Drive/MyResearch/final/')
 
-!ls
 
 # パッケージのimport
 import numpy as np
@@ -26,28 +22,30 @@ import torch.nn.functional as F
 
 from typing import NamedTuple
 
+
 class MinesweeperReward(NamedTuple):
     win: float = 1.0
     lose: float = -1.0
-    progress: float = 0.
+    progress: float = 0.0
+
 
 class MinesweeperEnv:
     def __init__(self, row=9, col=9, numMines=10):
-        self.row = row              # 行（高さ）
-        self.col = col              # 列（横幅）
-        self.numMines = numMines    # 地雷の個数
+        self.row = row  # 行（高さ）
+        self.col = col  # 列（横幅）
+        self.numMines = numMines  # 地雷の個数
 
-        self.mines = np.zeros([self.row, self.col])     # 地雷の位置
-        self.neighbors = np.zeros([self.row, self.col]) # 隣接する地雷の個数
-        self.state = np.zeros([self.row, self.col])     # 観測状態
+        self.mines = np.zeros([self.row, self.col])  # 地雷の位置
+        self.neighbors = np.zeros([self.row, self.col])  # 隣接する地雷の個数
+        self.state = np.zeros([self.row, self.col])  # 観測状態
         self.state.fill(np.nan)
 
-        self.noOpenCell = np.ones(self.row * self.col) # 開いているマス0, 開いていないマス1
+        self.noOpenCell = np.ones(self.row * self.col)  # 開いているマス0, 開いていないマス1
 
-        self.reward = MinesweeperReward()   # 報酬
+        self.reward = MinesweeperReward()  # 報酬
 
-        self.initialized = False    # 初期化判定
-        self.won = False            # 成功判定
+        self.initialized = False  # 初期化判定
+        self.won = False  # 成功判定
 
     # ゲームのリセット
     def reset(self):
@@ -66,16 +64,16 @@ class MinesweeperEnv:
         done = False
         # 開いているマスを開けた 例外処理
         if not np.isnan(self.state[coordinates[0], coordinates[1]]):
-            print('noprogress')
+            print("noprogress")
             reward = -1
         # 地雷マスを開けた
         if self.mines[coordinates[0], coordinates[1]] > 0:
-            self.state[coordinates[0], coordinates[1]] = -100   # 地雷
+            self.state[coordinates[0], coordinates[1]] = -100  # 地雷
             reward = self.reward.lose
             done = True
-        # 
+        #
         else:
-            if not self.initialized:    # 初期化
+            if not self.initialized:  # 初期化
                 self.initializeBoard(coordinates)
                 reward = 0.0
             # マスを開く
@@ -92,14 +90,26 @@ class MinesweeperEnv:
     def initializeBoard(self, coordinates):
         # 最初のマスは0
         numTotalCells = self.row * self.col
-        select = coordinates[0]*self.col + coordinates[1]
-        offLimits = np.array([select-self.col-1, select-self.col, select-self.col+1, 
-        select-1, select, select+1, 
-        select+self.col-1, select+self.col, select+self.col+1])
+        select = coordinates[0] * self.col + coordinates[1]
+        offLimits = np.array(
+            [
+                select - self.col - 1,
+                select - self.col,
+                select - self.col + 1,
+                select - 1,
+                select,
+                select + 1,
+                select + self.col - 1,
+                select + self.col,
+                select + self.col + 1,
+            ]
+        )
         availableCells = np.setdiff1d(np.arange(numTotalCells), offLimits)
         # 最初のマスとその周辺以外に爆弾を配置する
         minesFlattend = np.zeros([numTotalCells])
-        minesFlattend[np.random.choice(availableCells, self.numMines, replace=False)] = 1
+        minesFlattend[
+            np.random.choice(availableCells, self.numMines, replace=False)
+        ] = 1
         self.mines = minesFlattend.reshape([self.row, self.col])
         # 隣接する地雷の個数
         for row in range(self.row):
@@ -120,7 +130,7 @@ class MinesweeperEnv:
         row = coordinates[0]
         col = coordinates[1]
         self.state[row, col] = self.neighbors[row, col]
-        self.noOpenCell[row * self.col + col] = 0   # 開けたマスは0にする
+        self.noOpenCell[row * self.col + col] = 0  # 開けたマスは0にする
         # 0なら周囲の開いていないマスも開ける
         if self.state[row, col] == 0:
             for i in range(-1, 2):
@@ -130,13 +140,11 @@ class MinesweeperEnv:
                             if np.isnan(self.state[row + i, col + j]):
                                 self.openCell([row + i, col + j])
 
-
     # ランダムアクション（開いていないマスを開ける）
     def randomAction(self):
         nonOpenCell = np.array(np.where(self.noOpenCell)).flatten()
         action = np.random.choice(nonOpenCell)
         return action
-
 
     # 最初の行動の前に地雷設置
     def resetRandomInit(self):
@@ -146,7 +154,9 @@ class MinesweeperEnv:
         numTotalCells = self.row * self.col
         availableCells = np.arange(numTotalCells)
         minesFlattend = np.zeros([numTotalCells])
-        minesFlattend[np.random.choice(availableCells, self.numMines, replace=False)] = 1
+        minesFlattend[
+            np.random.choice(availableCells, self.numMines, replace=False)
+        ] = 1
         self.mines = minesFlattend.reshape([self.row, self.col])
         # 隣接する地雷の個数
         for row in range(self.row):
@@ -167,7 +177,6 @@ class MinesweeperEnv:
         self.won = False
         return self.state
 
-
     # 固定の地雷配置パターン
     def ResetAndSetMines(self, mines):
         self.mines = np.copy(mines)
@@ -185,16 +194,18 @@ class MinesweeperEnv:
 
         self.state.fill(np.nan)
         self.noOpenCell.fill(1)
-        
+
         self.initialized = True
         self.won = False
         return self.state
+
 
 # 経験を保存するメモリクラスを定義します
 from collections import namedtuple
 
 Transition = namedtuple(
-    'Transition', ('state', 'action', 'next_state', 'reward', 'availableAction'))
+    "Transition", ("state", "action", "next_state", "reward", "availableAction")
+)
 
 
 class ReplayMemory:
@@ -204,23 +215,25 @@ class ReplayMemory:
         self.index = 0  # 保存するindexを示す変数
 
     def push(self, state, action, state_next, reward, availableAction):
-        '''transition = (state, action, state_next, reward)をメモリに保存する'''
+        """transition = (state, action, state_next, reward)をメモリに保存する"""
         if len(self.memory) < self.capacity:
             self.memory.append(None)  # メモリが満タンでないときは足す
-        self.memory[self.index] = Transition(state, action, state_next, reward, availableAction)
+        self.memory[self.index] = Transition(
+            state, action, state_next, reward, availableAction
+        )
         self.index = (self.index + 1) % self.capacity
 
     def sample(self, batch_size):
-        '''batch_size分だけ、ランダムに保存内容を取り出す'''
+        """batch_size分だけ、ランダムに保存内容を取り出す"""
         return random.sample(self.memory, batch_size)
 
     def __len__(self):
-        '''関数lenに対して、現在の変数memoryの長さを返す'''
+        """関数lenに対して、現在の変数memoryの長さを返す"""
         return len(self.memory)
+
 
 # ディープ・ニューラルネットワークの構築
 class Net(nn.Module):
-
     def __init__(self, n_in, n_mid, n_out):
         super(Net, self).__init__()
         self.fc1 = nn.Linear(n_in, n_mid)
@@ -232,6 +245,7 @@ class Net(nn.Module):
         h2 = F.relu(self.fc2(h1))
         output = self.fc3(h2)
         return output
+
 
 # エージェントが持つ脳となるクラスです、DQNを実行します
 # Q関数をディープラーニングのネットワークをクラスとして定義
@@ -259,9 +273,8 @@ class Brain:
 
         self.epsilon = 0.5
 
-
     def replay(self):
-        '''Experience Replayでネットワークの結合パラメータを学習'''
+        """Experience Replayでネットワークの結合パラメータを学習"""
         # -----------------------------------------
         # 1. メモリサイズの確認
         # -----------------------------------------
@@ -290,10 +303,12 @@ class Brain:
         state_batch = torch.cat(batch.state)
         action_batch = torch.cat(batch.action)
         reward_batch = torch.cat(batch.reward)
-        non_final_next_states = torch.cat([s for s in batch.next_state
-                                           if s is not None])
-        availableAction_batch = torch.cat([a for a in batch.availableAction
-                                           if a is not None])
+        non_final_next_states = torch.cat(
+            [s for s in batch.next_state if s is not None]
+        )
+        availableAction_batch = torch.cat(
+            [a for a in batch.availableAction if a is not None]
+        )
 
         # -----------------------------------------
         # 3. 教師信号となるQ(s_t, a_t)値を求める
@@ -311,8 +326,9 @@ class Brain:
         # 3.3 max{Q(s_t+1, a)}値を求める。ただし次の状態があるかに注意。
 
         # cartpoleがdoneになっておらず、next_stateがあるかをチェックするインデックスマスクを作成
-        non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
-                                                    batch.next_state)), dtype=torch.bool)
+        non_final_mask = torch.tensor(
+            tuple(map(lambda s: s is not None, batch.next_state)), dtype=torch.bool
+        )
         # まずは全部0にしておく
         next_state_values = torch.zeros(BATCH_SIZE)
 
@@ -321,7 +337,10 @@ class Brain:
         # そしてそのQ値（index=0）を出力します
         # detachでその値を取り出します
         next_state_values[non_final_mask] = (
-            self.model(non_final_next_states)+availableAction_batch).max(1)[0].detach()
+            (self.model(non_final_next_states) + availableAction_batch)
+            .max(1)[0]
+            .detach()
+        )
 
         # 3.4 教師となるQ(s_t, a_t)値を、Q学習の式から求める
         expected_state_action_values = reward_batch + GAMMA * next_state_values
@@ -335,24 +354,23 @@ class Brain:
         # 4.2 損失関数を計算する（smooth_l1_lossはHuberloss）
         # expected_state_action_valuesは
         # sizeが[minbatch]になっているので、unsqueezeで[minibatch x 1]へ
-        loss = F.smooth_l1_loss(state_action_values,
-                                expected_state_action_values.unsqueeze(1))
+        loss = F.smooth_l1_loss(
+            state_action_values, expected_state_action_values.unsqueeze(1)
+        )
 
         # 4.3 結合パラメータを更新する
         self.optimizer.zero_grad()  # 勾配をリセット
         loss.backward()  # バックプロパゲーションを計算
         self.optimizer.step()  # 結合パラメータを更新
 
-
     def decide_action(self, state, availableAction, env):
-        '''現在の状態に応じて、行動を決定する'''
+        """現在の状態に応じて、行動を決定する"""
         # ε-greedy法で徐々に最適行動のみを採用する
 
         if self.epsilon <= np.random.uniform(0, 1):
             self.model.eval()  # ネットワークを推論モードに切り替える
             with torch.no_grad():
-                action = (self.model(state)+availableAction).max(1)[1].view(1, 1)
-                #print((self.model(state)*availableAction).max(1)[0].detach())
+                action = (self.model(state) + availableAction).max(1)[1].view(1, 1)
         else:
             action = torch.LongTensor([[env.randomAction()]])
 
@@ -362,29 +380,31 @@ class Brain:
         self.epsilon *= 0.9997
         self.epsilon = max(self.epsilon, 0.1)
 
+
 # CartPoleで動くエージェントクラスです、棒付き台車そのものになります
 
 
 class Agent:
     def __init__(self, num_states, num_actions):
-        '''課題の状態と行動の数を設定する'''
+        """課題の状態と行動の数を設定する"""
         self.brain = Brain(num_states, num_actions)  # エージェントが行動を決定するための頭脳を生成
 
     def update_q_function(self):
-        '''Q関数を更新する'''
+        """Q関数を更新する"""
         self.brain.replay()
 
     def get_action(self, state, availableAction, env):
-        '''行動を決定する'''
+        """行動を決定する"""
         action = self.brain.decide_action(state, availableAction, env)
         return action
 
     def memorize(self, state, action, state_next, reward, availableAction):
-        '''memoryオブジェクトに、state, action, state_next, rewardの内容を保存する'''
+        """memoryオブジェクトに、state, action, state_next, rewardの内容を保存する"""
         self.brain.memory.push(state, action, state_next, reward, availableAction)
 
     def updateEpsilon(self):
         self.brain.updateEpsilon()
+
 
 def obsTransform(obs, row, col):
     availableAction = np.zeros((row, col))
@@ -399,16 +419,20 @@ def obsTransform(obs, row, col):
                 state[i, j] = obs[i, j]
     state = torch.from_numpy(state.flatten()).type(torch.FloatTensor)
     state = torch.unsqueeze(state, 0)
-    availableAction = torch.from_numpy(availableAction.flatten()).type(torch.FloatTensor)
+    availableAction = torch.from_numpy(availableAction.flatten()).type(
+        torch.FloatTensor
+    )
     availableAction = torch.unsqueeze(availableAction, 0)
 
     return state, availableAction
 
+
 # main
 import csv
-with open ('data.csv', 'w') as f:
+
+with open("data.csv", "w") as f:
     writer = csv.writer(f)
-    writer.writerow(['episode', 'step', 'win rate'])
+    writer.writerow(["episode", "step", "win rate"])
 
 row = 6
 col = 6
@@ -418,13 +442,13 @@ num_states = row * col
 num_actions = row * col
 agent = Agent(num_states, num_actions)  # 環境内で行動するAgentを生成
 
-NUM_EPISODES = 500000  # 最大試行回数
+NUM_EPISODES = 1  # 最大試行回数
 win = 0
 lose = 0
 
-step = 0 # ステップ数
+step = 0  # ステップ数
 
-for episode in range(1, NUM_EPISODES+1):
+for episode in range(1, NUM_EPISODES + 1):
     ######******   訓練条件   ******######
     obs = env.reset()
 
@@ -435,6 +459,7 @@ for episode in range(1, NUM_EPISODES+1):
     while not done:  # 1エピソードのループ
         action = agent.get_action(state, availableAction, env)  # 行動を求める
         coordinates = divmod(action.item(), col)
+        print(coordinates)
         obs, reward, done, _ = env.step(coordinates)
         reward = torch.FloatTensor([reward])  # 報酬0
         state_next, availableAction = obsTransform(obs, row, col)
@@ -456,9 +481,9 @@ for episode in range(1, NUM_EPISODES+1):
     if env.won:
         win += 1
     else:
-        lose += 1    
+        lose += 1
     if episode % 100 == 0:
-        print('==== Episode {} : win {}, lose {} ===='.format(episode, win, lose))
+        print("==== Episode {} : win {}, lose {} ====".format(episode, win, lose))
         win = 0
         lose = 0
 
@@ -474,7 +499,7 @@ for episode in range(1, NUM_EPISODES+1):
             while not done:
                 with torch.no_grad():
                     value = agent.brain.model(state)
-                    action = (value+availableAction).max(1)[1].view(1, 1)
+                    action = (value + availableAction).max(1)[1].view(1, 1)
                 coordinates = divmod(action.item(), col)
                 obs, reward, done, _ = env.step(coordinates)
                 state_next, availableAction = obsTransform(obs, row, col)
@@ -482,8 +507,8 @@ for episode in range(1, NUM_EPISODES+1):
             if env.won:
                 winTest += 1
         print(winTest)
-        with open ('data.csv', 'a') as f:
+        with open("data.csv", "a") as f:
             writer = csv.writer(f)
             writer.writerow([episode, step, winTest])
         winTest = 0
-torch.save(agent.brain.model.state_dict(), 'model.pth')
+torch.save(agent.brain.model.state_dict(), "model.pth")
