@@ -84,10 +84,10 @@ class Brain:
         # それを torch.FloatTensor of size BATCH_SIZEx4 に変換します
         # 状態、行動、報酬、non_finalの状態のミニバッチのVariableを作成
         # catはConcatenates（結合）のことです。
-        state_batch = torch.cat(batch.state)
+        state_batch = torch.stack(batch.state)
         action_batch = torch.cat(batch.action)
         reward_batch = torch.cat(batch.reward)
-        non_final_next_states = torch.cat(
+        non_final_next_states = torch.stack(
             [s for s in batch.next_state if s is not None]
         )
 
@@ -149,7 +149,6 @@ class Brain:
         if self.epsilon <= np.random.uniform(0, 1):
             self.model.eval()  # ネットワークを推論モードに切り替える
             with torch.no_grad():
-                print(self.model(state).max(1)[1])
                 action = self.model(state).max(1)[1].view(1, 1)
         else:
             action = torch.LongTensor([[env.randomAction()]])
